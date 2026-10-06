@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>One Piece: Grand Arena Mobile</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    body {
+      background-color: #111;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+      color: white;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100vw;
+      max-width: 800px;
+      height: 450px;
+      background: #000;
+      border-bottom: 3px solid #ffcc00;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* HUD / Interface */
+    .hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      padding: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+
+    .player-ui {
+      width: 38%;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .player-name {
+      font-size: 14px;
+      font-weight: bold;
+      text-transform: uppercase;
+      text-shadow: 1px 1px #000;
+    }
+
+    .health-bar-outer, .special-bar-outer {
+      background: rgba(0, 0, 0, 0.6);
+      border: 2px solid #fff;
+      height: 18px;
+      width: 100%;
+      overflow: hidden;
+      border-radius: 3px;
+    }
+
+    .special-bar-outer {
+      height: 8px;
+      width: 60%;
+    }
+
+    .health-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, #ff3333, #ff6666);
+      width: 100%;
+      transition: width 0.1s linear;
+    }
+
+    .special-bar-inner {
+      height: 100%;
+      background: linear-gradient(90deg, #3399ff, #66ffff);
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    #p2-ui {
+      align-items: flex-end;
+    }
+
+    .timer {
+      background: rgba(0, 0, 0, 0.8);
+      border: 2px solid #ffcc00;
+      color: #ffcc00;
+      width: 45px;
+      height: 45px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 20px;
+      font-weight: bold;
+      border-radius: 50%;
+    }
+
+    /* Controles Touch na Tela */
+    #touch-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      max-width: 800px;
+      height: 150px;
+      background: #1a1a1a;
+      padding: 10px 20px;
+    }
+
+    .control-group {
+      display: flex;
+      gap: 12px;
+    }
+
+    .touch-btn {
+      width: 65px;
+      height: 65px;
+      background: rgba(255, 255, 255, 0.15);
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-radius: 50%;
+      color: white;
+      font-size: 22px;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .touch-btn:active, .touch-btn.pressed {
+      background: rgba(255, 204, 0, 0.6);
+      border-color: #ffcc00;
+    }
+
+    #btn-special {
+      background: rgba(51, 153, 255, 0.25);
+      border-color: #3399ff;
+    }
+    #btn-special.pressed {
+      background: rgba(51, 153, 255, 0.7);
+    }
+
+    /* Tela de Game Over */
+    #game-over {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 15px;
+      z-index: 10;
+    }
+
+    #game-over h1 {
+      font-size: 32px;
+      color: #ffcc00;
+      text-shadow: 2px 2px #ff0000;
+      text-align: center;
+    }
+
+    button.restart-btn {
+      padding: 10px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      background: #ffcc00;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <canvas id="gameCanvas" width="800" height="450"></canvas>
+
+    <!-- HUD -->
+    <div class="hud">
+      <div class="player-ui" id="p1-ui">
+        <div class="player-name" style="color: #ff4444;">Luffy</div>
+        <div class="health-bar-outer"><div id="p1-health" class="health-bar-inner"></div></div>
+        <div class="special-bar-outer"><div id="p1-special" class="special-bar-inner"></div></div>
+      </div>
+
+      <div id="timer" class="timer">99</div>
+
+      <div class="player-ui" id="p2-ui">
+        <div class="player-name" style="color: #33aaff;">Buggy</div>
+        <div class="health-bar-outer"><div id="p2-health" class="health-bar-inner"></div></div>
+      </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over">
+      <h1 id="winner-text">LUFFY VENCEU!</h1>
+      <button class="restart-btn" onclick="restartGame()">JOGAR NOVAMENTE</button>
+    </div>
+  </div>
+
+  <!-- Botões Touch -->
+  <div id="touch-controls">
+    <div class="control-group">
+      <div class="touch-btn" id="btn-left">←</div>
+      <div class="touch-btn" id="btn-right">→</div>
+      <div class="touch-btn" id="btn-jump">↑</div>
+    </div>
+    <div class="control-group">
+      <div class="touch-btn" id="btn-attack">SOCO</div>
+      <div class="touch-btn" id="btn-special">ESPEC</div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const GRAVITY = 0.6;
+    const CANVAS_WIDTH = 800;
+    const CANVAS_HEIGHT = 450;
+    const GROUND_Y = 380;
+
+    let gameActive = true;
+    let timer = 99;
+    let timerInterval;
+
+    class Fighter {
+      constructor({ position, velocity, isPlayer = false }) {
+        this.position = position;
+        this.velocity = velocity;
+        this.width = 45;
+        this.height = 95;
+        this.isPlayer = isPlayer;
+        this.health = 100;
+        this.special = 0;
+        this.isGrounded = false;
+        
+        this.isAttacking = false;
+        this.isSpecialAttacking = false;
+        this.attackBox = { position: { x: this.position.x, y: this.position.y }, width: 50, height: 40 };
+
+        this.facing = isPlayer ? 'right' : 'left';
+        this.isHit = false;
+        this.hitTimer = 0;
+      }
+
+      draw() {
+        ctx.save();
+        if (this.isHit) ctx.fillStyle = '#ffffff';
+
+        if (this.isPlayer) {
+          // Luffy
+          ctx.fillStyle = this.isHit ? '#ff8888' : '#cc0000';
+          ctx.fillRect(this.position.x, this.position.y + 35, this.width, 35);
+          ctx.fillStyle = '#0044cc';
+          ctx.fillRect(this.position.x, this.position.y + 70, this.width, 25);
+          ctx.fillStyle = '#ffcc99';
+          ctx.fillRect(this.position.x + 8, this.position.y + 10, 28, 25);
+          // Chapéu
+          ctx.fillStyle = '#e6b800';
+          ctx.fillRect(this.position.x - 4, this.position.y + 5, 52, 8);
+          ctx.fillRect(this.position.x + 8, this.position.y - 4, 28, 8);
+          ctx.fillStyle = '#cc0000';
+          ctx.fillRect(this.position.x + 8, this.position.y + 2, 28, 3);
+        } else {
+          // Buggy
+          ctx.fillStyle = this.isHit ? '#ff8888' : '#8800cc';
+          ctx.fillRect(this.position.x, this.position.y + 35, this.width, 35);
+          ctx.fillStyle = '#eeeeee';
+          ctx.fillRect(this.position.x, this.position.y + 70, this.width, 25);
+          ctx.fillStyle = '#ffcc99';
+          ctx.fillRect(this.position.x + 8, this.position.y + 10, 28, 25);
+          // Nariz vermelho
+          ctx.fillStyle = '#ff0000';
+          ctx.beginPath();
+          ctx.arc(this.position.x + (this.facing === 'left' ? 8 : 37), this.position.y + 22, 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Soco normal
+        if (this.isAttacking) {
+          ctx.fillStyle = '#ffcc99';
+          let attackX = this.facing === 'right' ? this.position.x + this.width : this.position.x - this.attackBox.width;
+          ctx.fillRect(attackX, this.position.y + 25, this.attackBox.width, 18);
+        }
+
+        // Especial (Gomu Gomu)
+        if (this.isSpecialAttacking) {
+          ctx.fillStyle = '#ff9966';
+          let attackX = this.facing === 'right' ? this.position.x + this.width : this.position.x - 180;
+          ctx.fillRect(attackX, this.position.y + 22, 180, 25);
+          ctx.fillStyle = '#222';
+          let fistX = this.facing === 'right' ? attackX + 150 : attackX;
+          ctx.fillRect(fistX, this.position.y + 18, 30, 33);
+        }
+
+        ctx.restore();
+      }
+
+      update() {
+        this.draw();
+
+        if (this.hitTimer > 0) {
+          this.hitTimer--;
+          if (this.hitTimer === 0) this.isHit = false;
+        }
+
+        this.attackBox.position.x = this.facing === 'right' ? this.position.x + this.width : this.position.x - this.attackBox.width;
+        this.attackBox.position.y = this.position.y + 15;
+
+        this.position.x += this.velocity.x;
+        this.position.y += this.velocity.y;
+
+        if (this.position.y + this.height + this.velocity.y >= GROUND_Y) {
+          this.velocity.y = 0;
+          this.position.y = GROUND_Y - this.height;
+          this.isGrounded = true;
+        } else {
+          this.velocity.y += GRAVITY;
+          this.isGrounded = false;
+        }
+
+        if (this.position.x < 0) this.position.x = 0;
+        if (this.position.x + this.width > CANVAS_WIDTH) this.position.x = CANVAS_WIDTH - this.width;
+      }
+
+      attack() {
+        if (this.isAttacking || this.isSpecialAttacking) return;
+        this.isAttacking = true;
+        setTimeout(() => { this.isAttacking = false; }, 200);
+      }
+
+      specialAttack() {
+        if (this.special < 100 || this.isAttacking || this.isSpecialAttacking) return;
+        this.special = 0;
+        this.isSpecialAttacking = true;
+        document.getElementById('p1-special').style.width = '0%';
+        setTimeout(() => { this.isSpecialAttacking = false; }, 400);
+      }
+
+      takeDamage(amount) {
+        this.health -= amount;
+        if (this.health < 0) this.health = 0;
+        this.isHit = true;
+        this.hitTimer = 10;
+      }
+    }
+
+    const player = new Fighter({ position: { x: 100, y: 0 }, velocity: { x: 0, y: 0 }, isPlayer: true });
+    const enemy = new Fighter({ position: { x: 650, y: 0 }, velocity: { x: 0, y: 0 }, isPlayer: false });
+
+    // Controles por Toque
+    const keys = { left: false, right: false };
+
+    function setupTouchButton(id, onDown, onUp) {
+      const btn = document.getElementById(id);
+      
+      btn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        btn.classList.add('pressed');
+        if (onDown) onDown();
+      }, { passive: false });
+
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        btn.classList.remove('pressed');
+        if (onUp) onUp();
+      }, { passive: false });
+    }
+
+    setupTouchButton('btn-left', () => keys.left = true, () => keys.left = false);
+    setupTouchButton('btn-right', () => keys.right = true, () => keys.right = false);
+    setupTouchButton('btn-jump', () => { if (player.isGrounded) player.velocity.y = -14; });
+    setupTouchButton('btn-attack', () => player.attack());
+    setupTouchButton('btn-special', () => player.specialAttack());
+
+    // IA do Inimigo
+    function updateAI() {
+      if (!gameActive) return;
+      const dist = player.position.x - enemy.position.x;
+      enemy.facing = dist > 0 ? 'right' : 'left';
+
+      if (Math.abs(dist) > 50) {
+        enemy.velocity.x = dist > 0 ? 2 : -2;
+      } else {
+        enemy.velocity.x = 0;
+        if (Math.random() < 0.025 && !enemy.isAttacking) enemy.attack();
+      }
+
+      if (Math.random() < 0.004 && enemy.isGrounded) enemy.velocity.y = -12;
+    }
+
+    function checkCollision(attacker, defender, attackRange) {
+      const atkX = attacker.facing === 'right' ? attacker.position.x + attacker.width : attacker.position.x - attackRange;
+      return (
+        atkX < defender.position.x + defender.width &&
+        atkX + attackRange > defender.position.x &&
+        attacker.position.y + 20 < defender.position.y + defender.height &&
+        attacker.position.y + 70 > defender.position.y
+      );
+    }
+
+    function drawBackground() {
+      // Céu
+      ctx.fillStyle = '#66ccff';
+      ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      // Sol
+      ctx.fillStyle = '#ffee55';
+      ctx.beginPath(); ctx.arc(120, 80, 40, 0, Math.PI * 2); ctx.fill();
+      // Mar
+      ctx.fillStyle = '#0066cc';
+      ctx.fillRect(0, 260, CANVAS_WIDTH, 120);
+      // Chão
+      ctx.fillStyle = '#e6c280';
+      ctx.fillRect(0, GROUND_Y, CANVAS_WIDTH, CANVAS_HEIGHT - GROUND_Y);
+      ctx.fillStyle = '#c29b53';
+      ctx.fillRect(0, GROUND_Y, CANVAS_WIDTH, 10);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      drawBackground();
+
+      player.velocity.x = 0;
+      if (keys.left) { player.velocity.x = -4.5; player.facing = 'left'; }
+      else if (keys.right) { player.velocity.x = 4.5; player.facing = 'right'; }
+
+      player.update();
+      updateAI();
+      enemy.update();
+
+      // Colisões
+      if (player.isAttacking && checkCollision(player, enemy, player.attackBox.width)) {
+        player.isAttacking = false;
+        enemy.takeDamage(8);
+        document.getElementById('p2-health').style.width = enemy.health + '%';
+        if (player.special < 100) {
+          player.special += 15;
+          if (player.special > 100) player.special = 100;
+          document.getElementById('p1-special').style.width = player.special + '%';
+        }
+      }
+
+      if (player.isSpecialAttacking && checkCollision(player, enemy, 180)) {
+        player.isSpecialAttacking = false;
+        enemy.takeDamage(25);
+        document.getElementById('p2-health').style.width = enemy.health + '%';
+      }
+
+      if (enemy.isAttacking && checkCollision(enemy, player, enemy.attackBox.width)) {
+        enemy.isAttacking = false;
+        player.takeDamage(6);
+        document.getElementById('p1-health').style.width = player.health + '%';
+      }
+
+      if (player.health <= 0 || enemy.health <= 0) endGame();
+    }
+
+    function startTimer() {
+      timerInterval = setInterval(() => {
+        if (timer > 0 && gameActive) {
+          timer--;
+          document.getElementById('timer').innerText = timer;
+        } else if (timer === 0) {
+          endGame();
+        }
+      }, 1000);
+    }
+
+    function endGame() {
+      if (!gameActive) return;
+      gameActive = false;
+      clearInterval(timerInterval);
+      document.getElementById('game-over').style.display = 'flex';
+      const winnerText = document.getElementById('winner-text');
+      if (player.health > enemy.health) winnerText.innerText = "LUFFY VENCEU!";
+      else if (enemy.health > player.health) winnerText.innerText = "BUGGY VENCEU!";
+      else winnerText.innerText = "EMPATE!";
+    }
+
+    function restartGame() {
+      gameActive = true;
+      timer = 99;
+      player.health = 100;
+      enemy.health = 100;
+      player.special = 0;
+      player.position = { x: 100, y: 0 };
+      enemy.position = { x: 650, y: 0 };
+      document.getElementById('p1-health').style.width = '100%';
+      document.getElementById('p2-health').style.width = '100%';
+      document.getElementById('p1-special').style.width = '0%';
+      document.getElementById('timer').innerText = timer;
+      document.getElementById('game-over').style.display = 'none';
+      clearInterval(timerInterval);
+      startTimer();
+    }
+
+    startTimer();
+    animate();
+  </script>
+</body>
+</html>
